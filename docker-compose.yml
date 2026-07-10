@@ -1,0 +1,101 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: scalecart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scalecart
+      POSTGRES_PASSWORD: scalecart_dev_pw
+      POSTGRES_DB: scalecart
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scalecart"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: scalecart-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  catalog:
+    build: ./services/catalog
+    container_name: scalecart-catalog
+    restart: unless-stopped
+    env_file: ./services/catalog/.env
+    environment:
+      DATABASE_URL: postgresql://scalecart:scalecart_dev_pw@postgres:5432/scalecart
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/catalog/app:/app/app
+
+  cart:
+    build: ./services/cart
+    container_name: scalecart-cart
+    restart: unless-stopped
+    env_file: ./services/cart/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CATALOG_SERVICE_URL: http://catalog:8000
+    ports:
+      - "8002:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      catalog:
+        condition: service_started
+    volumes:
+      - ./services/cart/app:/app/app
+
+  orders:
+    build: ./services/orders
+    container_name: scalecart-orders
+    restart: unless-stopped
+    env_file: ./services/orders/.env
+    environment:
+      DATABASE_URL: postgresql://scalecart:scalecart_dev_pw@postgres:5432/scalecart
+      CART_SERVICE_URL: http://cart:8000
+      PAYMENTS_SERVICE_URL: http://payments:8000
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/orders/app:/app/app
+
+  payments:
+    build: ./services/payments
+    container_name: scalecart-payments
+    restart: unless-stopped
+    env_file: ./services/payments/.env
+    environment:
+      DATABASE_URL: postgresql://scalecart:scalecart_dev_pw@postgres:5432/scalecart
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/payments/app:/app/app
+
+volumes:
+  pgdata:
