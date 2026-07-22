@@ -309,11 +309,11 @@ scalecart/
 - [x] **Orders service** — cart fetch, order creation with line items, status enum (`pending`/`paid`/`failed`/`fulfilled`/`cancelled`)
 - [x] **Payments service** — Stripe PaymentIntent creation, webhook handling, idempotent event tracking
 - [x] **Database isolation** — schema-per-service on shared Postgres, auto-created via init SQL
+- [x] **Cart test suite** — 13 pytest tests using fakeredis (in-memory Redis) + respx (httpx mock), covering add/remove/clear, quantity merging, catalog validation (200/404/503), payload validation, and cart isolation
 - [x] **Python 3.13 compatibility** — all dependencies pinned to versions with prebuilt wheels
 
 ### 🔧 In Progress
 
-- [ ] **Cart test suite** — pytest for Redis operations, cross-service validation mocking
 - [ ] **Orders → Payments wiring** — create PaymentIntent on order placement, return `client_secret`
 - [ ] **Webhook → Orders callback** — flip `order.status` to `paid` on `payment_intent.succeeded`
 - [ ] **Real price lookup** — replace placeholder unit price with catalog service call in order creation
