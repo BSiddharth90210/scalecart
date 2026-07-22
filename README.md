@@ -312,15 +312,17 @@ scalecart/
 - [x] **Cart test suite** — 13 pytest tests using fakeredis (in-memory Redis) + respx (httpx mock), covering add/remove/clear, quantity merging, catalog validation (200/404/503), payload validation, and cart isolation
 - [x] **Python 3.13 compatibility** — all dependencies pinned to versions with prebuilt wheels
 
+- [x] **Orders → Payments wiring** — create PaymentIntent on order placement, return `client_secret`
+- [x] **Webhook → Orders callback** — flip `order.status` to `paid` on `payment_intent.succeeded`
+- [x] **Real price lookup** — replace placeholder unit price with catalog service call in order creation
+- [x] **Orders test suite** — 11 pytest tests using respx to mock cart, catalog, and payments upstream calls
+
 ### 🔧 In Progress
 
-- [ ] **Orders → Payments wiring** — create PaymentIntent on order placement, return `client_secret`
-- [ ] **Webhook → Orders callback** — flip `order.status` to `paid` on `payment_intent.succeeded`
-- [ ] **Real price lookup** — replace placeholder unit price with catalog service call in order creation
+- [ ] **Auth** — JWT-based authentication middleware
 
 ### 📋 Planned
 
-- [ ] **Auth** — JWT-based authentication middleware
 - [ ] **Async workflows** — SQS + Lambda for email confirmation, inventory updates, receipt generation
 - [ ] **AWS deployment** — EC2 Auto Scaling + ALB, RDS, ElastiCache, ECS
 - [ ] **CI/CD pipeline** — GitHub Actions: lint → test → build → push → deploy

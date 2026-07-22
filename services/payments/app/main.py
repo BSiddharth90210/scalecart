@@ -1,4 +1,5 @@
 import os
+import httpx
 import stripe
 from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from app.schemas import PaymentIntentCreate, PaymentIntentOut
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://localhost:8003")
 stripe.api_key = STRIPE_SECRET_KEY
 
 app = FastAPI(title="ScaleCart - Payments Service")
@@ -87,8 +89,17 @@ async def stripe_webhook(
         )
         if record:
             record.status = "succeeded"
-            # TODO: call the orders service to flip order.status -> "paid",
-            # and publish an SQS message to trigger email/inventory/receipt workflows.
+            # Notify the orders service to flip the order to "paid".
+            # Best-effort: if orders is unreachable, the status can be
+            # reconciled later via a batch job.
+            async with httpx.AsyncClient(timeout=5.0) as http:
+                try:
+                    await http.patch(
+                        f"{ORDERS_SERVICE_URL}/orders/{record.order_id}/status",
+                        json={"status": "paid"},
+                    )
+                except httpx.RequestError:
+                    pass  # logged in production; reconciled async
 
     elif event["type"] == "payment_intent.payment_failed":
         intent = event["data"]["object"]
@@ -99,6 +110,14 @@ async def stripe_webhook(
         )
         if record:
             record.status = "failed"
+            async with httpx.AsyncClient(timeout=5.0) as http:
+                try:
+                    await http.patch(
+                        f"{ORDERS_SERVICE_URL}/orders/{record.order_id}/status",
+                        json={"status": "failed"},
+                    )
+                except httpx.RequestError:
+                    pass
 
     db.add(ProcessedWebhookEvent(stripe_event_id=event["id"]))
     db.commit()

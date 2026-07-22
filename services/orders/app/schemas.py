@@ -7,6 +7,10 @@ class OrderCreate(BaseModel):
     customer_email: str
 
 
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
+
+
 class OrderItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     product_id: int
@@ -23,3 +27,7 @@ class OrderOut(BaseModel):
     total_cents: int
     currency: str
     items: list[OrderItemOut]
+    # Populated on creation only — the Stripe client_secret needed by the
+    # frontend to complete payment via Stripe.js.  None when fetching
+    # an existing order (the secret is stored in the payments service).
+    client_secret: str | None = None
