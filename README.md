@@ -67,6 +67,21 @@ curl -X POST localhost:8003/orders -H "Content-Type: application/json" -d '{
 }'
 ```
 
+## Running tests
+
+Each service will get its own test suite as it's built out. So far: **catalog**.
+
+```bash
+cd services/catalog
+python -m venv venv
+venv\Scripts\activate          # Windows PowerShell
+pip install -r requirements.txt -r requirements-dev.txt
+pytest -v
+```
+
+Tests run against an in-memory SQLite DB (no Postgres/Docker needed) so they're fast
+and isolated — each test gets a clean set of tables via an autouse fixture in `conftest.py`.
+
 ## Stripe setup (for the payments service)
 
 1. Create a free Stripe account, grab your **test mode** secret key from
@@ -82,7 +97,8 @@ curl -X POST localhost:8003/orders -H "Content-Type: application/json" -d '{
 
 This skeleton gets you a running, wired-together system. Here's the natural build order from here:
 
-- [ ] **Catalog**: pagination, search/filtering, category model, image URLs (S3 later)
+- [x] **Catalog**: pagination + search filtering + pytest suite (12 tests, in-memory SQLite)
+- [ ] **Catalog** (later): category model, image URLs (S3)
 - [ ] **Cart**: replace the flat `1000` cent placeholder in orders with a real
       per-product price lookup against catalog
 - [ ] **Orders → Payments**: wire `orders.create_order` to actually call
