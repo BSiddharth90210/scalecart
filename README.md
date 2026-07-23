@@ -77,8 +77,9 @@ This isn't a monolith split into folders. Each service has its own **Dockerfile,
 ```
 Cart ──validates product──► Catalog    (GET /products/{id})
 Orders ──fetches cart──────► Cart      (GET /carts/{cart_id})
-Orders ──creates payment───► Payments  (POST /payment-intents) [wiring in progress]
-Payments ──confirms order──► Orders    (webhook callback)      [wiring in progress]
+Orders ──price lookup──────► Catalog   (GET /products/{id})
+Orders ──creates payment───► Payments  (POST /payment-intents)
+Payments ──confirms order──► Orders    (PATCH /orders/{id}/status via webhook)
 ```
 
 ---
@@ -204,7 +205,8 @@ tests/test_products.py::test_pagination_limit_out_of_range_422   PASSED
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/orders/{id}` | Get order details with line items |
-| `POST` | `/orders` | Create order from cart (fetches cart, creates order record with line items) |
+| `POST` | `/orders` | Create order from cart (fetches cart, looks up real prices from catalog, creates Stripe PaymentIntent, returns `client_secret`) |
+| `PATCH` | `/orders/{id}/status` | Update order status (called by payments webhook on success/failure) |
 
 ### Payments Service (`:8004`)
 
@@ -277,14 +279,22 @@ scalecart/
 │   │   ├── app/
 │   │   │   ├── main.py             # Add/remove/clear + catalog product validation
 │   │   │   └── schemas.py          # CartItem, CartOut
-│   │   └── Dockerfile
+│   │   ├── tests/
+│   │   │   ├── conftest.py         # fakeredis fixture + TestClient
+│   │   │   └── test_cart.py        # 13 tests — add/remove/clear, quantity merge, error paths
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
 │   ├── orders/                     # Order lifecycle management
 │   │   ├── app/
-│   │   │   ├── main.py             # Cart fetch → order creation with line items
+│   │   │   ├── main.py             # Cart fetch → catalog price lookup → payment → order creation
 │   │   │   ├── models.py           # Order + OrderItem + OrderStatus enum
-│   │   │   ├── schemas.py          # OrderCreate, OrderOut
+│   │   │   ├── schemas.py          # OrderCreate, OrderOut, OrderStatusUpdate
 │   │   │   └── db.py
-│   │   └── Dockerfile
+│   │   ├── tests/
+│   │   │   ├── conftest.py         # SQLite in-memory fixture + TestClient
+│   │   │   └── test_orders.py      # 11 tests — full flow, error paths, status update
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
 │   └── payments/                   # Stripe integration
 │       ├── app/
 │       │   ├── main.py             # PaymentIntent creation + idempotent webhook handler
@@ -311,7 +321,6 @@ scalecart/
 - [x] **Database isolation** — schema-per-service on shared Postgres, auto-created via init SQL
 - [x] **Cart test suite** — 13 pytest tests using fakeredis (in-memory Redis) + respx (httpx mock), covering add/remove/clear, quantity merging, catalog validation (200/404/503), payload validation, and cart isolation
 - [x] **Python 3.13 compatibility** — all dependencies pinned to versions with prebuilt wheels
-
 - [x] **Orders → Payments wiring** — create PaymentIntent on order placement, return `client_secret`
 - [x] **Webhook → Orders callback** — flip `order.status` to `paid` on `payment_intent.succeeded`
 - [x] **Real price lookup** — replace placeholder unit price with catalog service call in order creation
