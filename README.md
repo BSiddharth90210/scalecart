@@ -11,6 +11,11 @@
     <a href="#design-decisions">Design Decisions</a> •
     <a href="#development-progress">Progress</a>
   </p>
+  <p align="center">
+    <a href="https://github.com/BSiddharth90210/scalecart/actions/workflows/ci.yml">
+      <img src="https://github.com/BSiddharth90210/scalecart/actions/workflows/ci.yml/badge.svg" alt="CI">
+    </a>
+  </p>
 </p>
 
 <br/>
@@ -27,7 +32,8 @@ This isn't a monolith split into folders. Each service has its own **Dockerfile,
 - **Stripe payment processing** with webhook-driven order confirmation and idempotent event handling (no duplicate charges)
 - **Schema-per-service isolation** on a shared PostgreSQL instance — cheap for dev, same pattern scales to separate RDS instances in prod
 - **Redis-backed cart** with TTL-based session expiry and cross-service product validation
-- **12-test pytest suite** (catalog) running against in-memory SQLite — fast, no external dependencies
+- **46-test pytest suite** across 4 services — catalog (12), cart (13), orders (11), payments (10) — all against in-memory backends
+- **GitHub Actions CI** running all tests in parallel on every push
 - **Docker Compose** orchestration with health checks, dependency ordering, and hot-reload dev volumes
 
 ---
@@ -301,9 +307,14 @@ scalecart/
 │       │   ├── models.py           # PaymentIntentRecord + ProcessedWebhookEvent
 │       │   ├── schemas.py          # PaymentIntentCreate, PaymentIntentOut
 │       │   └── db.py
-│       └── Dockerfile
+│       ├── tests/
+│       │   ├── conftest.py         # SQLite in-memory fixture + TestClient
+│       │   └── test_payments.py    # 10 tests — Stripe mocks, webhook idempotency, error paths
+│       ├── Dockerfile
+│       └── requirements.txt
 └── .github/
-    └── workflows/                  # CI/CD pipeline (planned)
+    └── workflows/
+        └── ci.yml                  # GitHub Actions: 4 parallel test jobs on every push/PR
 ```
 
 ---
@@ -325,6 +336,8 @@ scalecart/
 - [x] **Webhook → Orders callback** — flip `order.status` to `paid` on `payment_intent.succeeded`
 - [x] **Real price lookup** — replace placeholder unit price with catalog service call in order creation
 - [x] **Orders test suite** — 11 pytest tests using respx to mock cart, catalog, and payments upstream calls
+- [x] **Payments test suite** — 10 pytest tests using `unittest.mock` to mock Stripe SDK + respx for orders callback, covering PaymentIntent creation, webhook processing (succeeded/failed), idempotent duplicate detection, invalid signatures
+- [x] **CI/CD pipeline** — GitHub Actions running all 46 tests across 4 services in parallel on every push/PR
 
 ### 🔧 In Progress
 
@@ -334,7 +347,6 @@ scalecart/
 
 - [ ] **Async workflows** — SQS + Lambda for email confirmation, inventory updates, receipt generation
 - [ ] **AWS deployment** — EC2 Auto Scaling + ALB, RDS, ElastiCache, ECS
-- [ ] **CI/CD pipeline** — GitHub Actions: lint → test → build → push → deploy
 - [ ] **Static assets** — S3 + CloudFront CDN for product images
 - [ ] **Category model** — product categorization and filtered browsing
 
